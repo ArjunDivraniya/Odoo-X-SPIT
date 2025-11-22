@@ -33,8 +33,9 @@ const formatUser = (user) => ({
 router.post('/create', protect, adminOnly, async (req, res) => {
   try {
     const { name, email, role, warehouses, phone, status } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email: normalizedEmail });
     if (userExists) return res.status(400).json({ message: 'User already exists' });
 
     const randomPassword = otpGenerator.generate(10, { upperCaseAlphabets: true, specialChars: true, digits: true });
@@ -47,7 +48,7 @@ router.post('/create', protect, adminOnly, async (req, res) => {
 
     const newUser = await User.create({
       fullName: name,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       role: role || 'Warehouse Staff',
       warehouses: warehouses || [],

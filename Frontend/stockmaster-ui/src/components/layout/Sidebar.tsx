@@ -49,15 +49,29 @@ export function Sidebar() {
     { title: 'Analytics', icon: BarChart3, path: '/analytics' },
   ];
 
-  // Dynamically add menu items based on role
-  if (user?.role === 'admin' || user?.role === 'Admin') {
-    // Only add if not already present (to prevent duplicates in strict mode)
+  // Normalize role and control menu visibility
+  const role = user?.role ? String(user.role).toLowerCase() : null;
+
+  // Admin: full access (Users + Settings)
+  if (role === 'admin') {
     if (!menuItems.find(i => i.title === 'Users')) {
-       menuItems.splice(2, 0, { title: 'Users', icon: User, path: '/users' });
+      menuItems.splice(2, 0, { title: 'Users', icon: User, path: '/users' });
     }
     if (!menuItems.find(i => i.title === 'Settings')) {
-       menuItems.splice(8, 0, { title: 'Settings', icon: Settings, path: '/settings' }); // Add to end or specific position
+      menuItems.splice(8, 0, { title: 'Settings', icon: Settings, path: '/settings' });
     }
+  }
+
+  // Inventory Manager: remove Users & Settings but keep Analytics
+  if (role === 'inventory manager') {
+    // do nothing here; default menu already contains analytics and inventory items
+  }
+
+  // Warehouse Staff & Picker: hide Analytics
+  if (role === 'warehouse staff' || role === 'picker') {
+    // remove Analytics from menu
+    const idx = menuItems.findIndex(i => i.title === 'Analytics');
+    if (idx >= 0) menuItems.splice(idx, 1);
   }
 
   return (

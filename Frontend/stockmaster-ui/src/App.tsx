@@ -17,6 +17,8 @@ import Movements from "./pages/Movements";
 import Analytics from "./pages/Analytics";
 import Users from "./pages/Users";
 import UserDetails from "./pages/UserDetails";
+import ProtectedRoute from './components/ProtectedRoute';
+
 import SettingsHome from './pages/Settings/Home';
 import AccountSettings from './pages/Settings/Account';
 import WarehouseSettings from './pages/Settings/Warehouses';
@@ -39,24 +41,24 @@ const App = () => (
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/warehouses" element={<Warehouses />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/products/:id" element={<ProductDetails />} />
-          <Route path="/receipts" element={<Receipts />} />
-          <Route path="/deliveries" element={<Deliveries />} />
-          <Route path="/transfers" element={<Transfers />} />
-          <Route path="/adjustments" element={<Adjustments />} />
-            <Route path="/users" element={<Users />} />
-            <Route path="/users/:id" element={<UserDetails />} />
-            <Route path="/settings" element={<SettingsHome />} />
-            <Route path="/settings/account" element={<AccountSettings />} />
-            <Route path="/settings/warehouses" element={<WarehouseSettings />} />
-            <Route path="/settings/roles" element={<RolePermissions />} />
-            <Route path="/settings/system" element={<SystemPreferences />} />
-            <Route path="/settings/notifications" element={<NotificationSettings />} />
-            <Route path="/settings/security" element={<SecuritySettings />} />
-            <Route path="/settings/about" element={<AboutSettings />} />
+          <Route path="/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+          <Route path="/products/:id" element={<ProtectedRoute><ProductDetails /></ProtectedRoute>} />
+          <Route path="/receipts" element={<ProtectedRoute><Receipts /></ProtectedRoute>} />
+          <Route path="/deliveries" element={<ProtectedRoute><Deliveries /></ProtectedRoute>} />
+          <Route path="/transfers" element={<ProtectedRoute><Transfers /></ProtectedRoute>} />
+          <Route path="/adjustments" element={<ProtectedRoute allowedRoles={["admin", "inventory manager", "warehouse staff"]}><Adjustments /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute allowedRoles={["admin"]}><Users /></ProtectedRoute>} />
+          <Route path="/users/:id" element={<ProtectedRoute allowedRoles={["admin"]}><UserDetails /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute allowedRoles={["admin"]}><SettingsHome /></ProtectedRoute>} />
+          <Route path="/settings/account" element={<ProtectedRoute allowedRoles={["admin"]}><AccountSettings /></ProtectedRoute>} />
+          <Route path="/settings/warehouses" element={<ProtectedRoute allowedRoles={["admin"]}><WarehouseSettings /></ProtectedRoute>} />
+          <Route path="/settings/roles" element={<ProtectedRoute allowedRoles={["admin"]}><RolePermissions /></ProtectedRoute>} />
+          <Route path="/settings/system" element={<ProtectedRoute allowedRoles={["admin"]}><SystemPreferences /></ProtectedRoute>} />
+          <Route path="/settings/notifications" element={<ProtectedRoute allowedRoles={["admin"]}><NotificationSettings /></ProtectedRoute>} />
+          <Route path="/settings/security" element={<ProtectedRoute allowedRoles={["admin"]}><SecuritySettings /></ProtectedRoute>} />
+          <Route path="/settings/about" element={<ProtectedRoute allowedRoles={["admin"]}><AboutSettings /></ProtectedRoute>} />
           <Route path="/movements" element={<Movements />} />
           <Route path="/analytics" element={<Analytics />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -11,7 +11,8 @@ router.get('/', protect, async (req, res) => {
     // If logged in user is Admin, they are the owner. 
     // If staff, we use the adminId stored in their token/user record.
     // Fallback to req.user.id if adminId is missing (for root admins)
-    const ownerId = req.user.adminId || (req.user.role === 'Admin' || req.user.role === 'admin' ? req.user.id : null);
+    const isAdmin = req.user.role && String(req.user.role).toLowerCase() === 'admin';
+    const ownerId = req.user.adminId || (isAdmin ? req.user.id : null);
 
     if (!ownerId) {
        return res.json([]); 

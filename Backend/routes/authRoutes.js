@@ -15,28 +15,30 @@ const transporter = nodemailer.createTransport({
 // 1. Send OTP
 router.post('/send-otp', async (req, res) => {
   const { email } = req.body;
+  const normalizedEmail = String(email || '').trim().toLowerCase();
   const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false });
-  await Otp.create({ email, otp });
+  await Otp.create({ email: normalizedEmail, otp });
 
-  await transporter.sendMail({ 
-    from: process.env.EMAIL_USER, 
-    to: email, 
-    subject: 'StockMaster OTP', 
-    text: `Your OTP is ${otp}` 
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: normalizedEmail,
+    subject: 'StockMaster OTP',
+    text: `Your OTP is ${otp}`
   });
-  
-  console.log(`MOCK EMAIL TO ${email}: Your OTP is ${otp}`);
+
+  console.log(`MOCK EMAIL TO ${normalizedEmail}: Your OTP is ${otp}`);
   res.json({ message: 'OTP sent successfully' });
 });
 
 // 2. Admin Signup
 router.post('/signup', async (req, res) => {
   const { fullName, email, password, otp } = req.body;
+  const normalizedEmail = String(email || '').trim().toLowerCase();
 
-  const validOtp = await Otp.findOne({ email, otp });
+  const validOtp = await Otp.findOne({ email: normalizedEmail, otp });
   if (!validOtp) return res.status(400).json({ message: 'Invalid or expired OTP' });
 
-  const userExists = await User.findOne({ email });
+  const userExists = await User.findOne({ email: normalizedEmail });
   if (userExists) return res.status(400).json({ message: 'User already exists' });
 
   const salt = await bcrypt.genSalt(10);
@@ -45,7 +47,7 @@ router.post('/signup', async (req, res) => {
   // Create Admin
   const user = await User.create({
     fullName,
-    email,
+    email: normalizedEmail,
     password: hashedPassword,
     role: 'Admin', // Normalized to match frontend enum usually
     isVerified: true
@@ -64,7 +66,8 @@ router.post('/signup', async (req, res) => {
 // 3. Login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail });
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return res.status(400).json({ message: 'Invalid credentials' });
