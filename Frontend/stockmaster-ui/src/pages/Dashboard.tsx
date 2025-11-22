@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -9,32 +10,87 @@ import {
   Settings,
   TrendingUp,
   TrendingDown,
+  Loader2
 } from 'lucide-react';
-import { mockDashboardData, mockMovements } from '@/lib/mockData';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import dashboardIllustration from '@/assets/dashboard-illustration.jpg';
+import api from '@/lib/api';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export default function Dashboard() {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
+  const [movements, setMovements] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [analyticsRes, movementsRes] = await Promise.all([
+          api.get('/analytics'),
+          api.get('/movements')
+        ]);
+        setData(analyticsRes.data);
+        setMovements(movementsRes.data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex h-[80vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Default Fallback if API returns null
+  const kpis = data?.kpis || [
+    { label: 'Total Products', value: 0, icon: 'Package', trend: 'neutral', change: '0%' },
+    { label: 'Low Stock Items', value: 0, icon: 'AlertTriangle', trend: 'neutral', change: '0%' },
+    { label: 'Pending Receipts', value: 0, icon: 'ArrowDownToLine', trend: 'neutral', change: '0%' },
+    { label: 'Pending Deliveries', value: 0, icon: 'ArrowUpFromLine', trend: 'neutral', change: '0%' },
+    { label: 'Scheduled Transfers', value: 0, icon: 'ArrowLeftRight', trend: 'neutral', change: '0%' },
+    { label: 'Total Adjustments', value: 0, icon: 'Settings', trend: 'neutral', change: '0%' },
+  ];
+  
+  const stockByCategory = data?.categoryData || [];
+  const stockTrend = data?.stockTrend || [];
+
   return (
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Main Warehouse - New York, NY</p>
+          <p className="text-muted-foreground">Main Warehouse - Overview</p>
         </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {mockDashboardData.kpis.map((kpi, index) => {
-            const icons = [Package, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, Settings];
-            const Icon = icons[index];
+          {kpis.map((kpi: any, index: number) => {
+            // Icon Mapping
+            const iconMap: any = {
+              'Package': Package,
+              'AlertTriangle': AlertTriangle,
+              'ArrowDownToLine': ArrowDownToLine,
+              'ArrowUpFromLine': ArrowUpFromLine,
+              'ArrowLeftRight': ArrowLeftRight,
+              'Settings': Settings
+            };
+            const Icon = iconMap[kpi.icon] || Package;
             
             return (
-              <Card key={kpi.label} className="shadow-neumorphic hover:shadow-lg transition-all animate-fade-in">
+              <Card key={index} className="shadow-neumorphic hover:shadow-lg transition-all animate-fade-in">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-2">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -45,6 +101,7 @@ export default function Dashboard() {
                   </div>
                   <p className="text-2xl font-bold mb-1">{kpi.value}</p>
                   <p className="text-sm text-muted-foreground">{kpi.label}</p>
+                  {/* Restored UI Element */}
                   <p className="text-xs text-muted-foreground mt-1">{kpi.change} from last week</p>
                 </CardContent>
               </Card>
@@ -61,12 +118,12 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={mockDashboardData.stockByCategory}>
+                <BarChart data={stockByCategory}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                  <XAxis dataKey="category" fontSize={12} />
+                  <XAxis dataKey="name" fontSize={12} />
                   <YAxis fontSize={12} />
                   <Tooltip />
-                  <Bar dataKey="quantity" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -79,7 +136,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={mockDashboardData.stockTrend}>
+                <LineChart data={stockTrend}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
                   <XAxis dataKey="date" fontSize={12} />
                   <YAxis fontSize={12} />
@@ -102,7 +159,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockMovements.map((movement) => (
+                {movements.length > 0 ? movements.slice(0, 5).map((movement: any) => (
                   <div key={movement.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-4 flex-1">
                       <div>
@@ -114,13 +171,15 @@ export default function Dashboard() {
                       <Badge variant={movement.type === 'Receipt' ? 'default' : movement.type === 'Delivery' ? 'secondary' : 'outline'}>
                         {movement.type}
                       </Badge>
-                      <span className={`font-semibold ${movement.quantity.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
+                      <span className={`font-semibold ${String(movement.quantity).startsWith('+') ? 'text-success' : 'text-destructive'}`}>
                         {movement.quantity}
                       </span>
-                      <span className="text-sm text-muted-foreground">{movement.date}</span>
+                      <span className="text-sm text-muted-foreground">{new Date(movement.date).toLocaleDateString()}</span>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center py-4 text-muted-foreground">No recent movements found.</div>
+                )}
               </div>
             </CardContent>
           </Card>

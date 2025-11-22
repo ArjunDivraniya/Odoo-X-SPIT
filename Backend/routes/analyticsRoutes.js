@@ -1,3 +1,4 @@
+// Backend/routes/analyticsRoutes.js
 const express = require('express');
 const Product = require('../models/Product');
 const Receipt = require('../models/Receipt');
@@ -13,7 +14,6 @@ router.get('/', protect, async (req, res) => {
   try {
     const ownerId = getOwnerId(req);
     
-    // Fetch all necessary data in parallel
     const [products, receipts, deliveries, transfers, adjustments] = await Promise.all([
       Product.find({ adminId: ownerId }),
       Receipt.find({ adminId: ownerId }),
@@ -27,15 +27,8 @@ router.get('/', protect, async (req, res) => {
     const categoryMap = {};
 
     products.forEach(p => {
-      // Calculate total stock for this product across all warehouses
       const totalStock = p.stock ? Array.from(p.stock.values()).reduce((a, b) => a + b, 0) : 0;
-      
-      // Check Low Stock (if total is less than minLevel)
-      if (totalStock <= (p.minLevel || 0)) {
-        lowStockCount++;
-      }
-
-      // Aggregate Category Data
+      if (totalStock <= (p.minLevel || 0)) lowStockCount++;
       categoryMap[p.category] = (categoryMap[p.category] || 0) + totalStock;
     });
 
@@ -43,55 +36,40 @@ router.get('/', protect, async (req, res) => {
     const pendingDeliveries = deliveries.filter(d => d.status !== 'completed').length;
     const scheduledTransfers = transfers.filter(t => t.status !== 'completed').length;
 
+    // Added 'change' field to match Frontend UI requirements
     const kpis = [
-      { label: 'Total Products', value: products.length, icon: 'Package', trend: 'neutral' },
-      { label: 'Low Stock Items', value: lowStockCount, icon: 'AlertTriangle', trend: lowStockCount > 0 ? 'down' : 'up' },
-      { label: 'Pending Receipts', value: pendingReceipts, icon: 'ArrowDownToLine', trend: 'neutral' },
-      { label: 'Pending Deliveries', value: pendingDeliveries, icon: 'ArrowUpFromLine', trend: 'neutral' },
-      { label: 'Scheduled Transfers', value: scheduledTransfers, icon: 'ArrowLeftRight', trend: 'neutral' },
-      { label: 'Total Adjustments', value: adjustments.length, icon: 'Settings', trend: 'neutral' },
+      { label: 'Total Products', value: products.length, icon: 'Package', trend: 'up', change: '+0%' },
+      { label: 'Low Stock Items', value: lowStockCount, icon: 'AlertTriangle', trend: lowStockCount > 0 ? 'down' : 'up', change: '0%' },
+      { label: 'Pending Receipts', value: pendingReceipts, icon: 'ArrowDownToLine', trend: 'neutral', change: '0%' },
+      { label: 'Pending Deliveries', value: pendingDeliveries, icon: 'ArrowUpFromLine', trend: 'neutral', change: '0%' },
+      { label: 'Scheduled Transfers', value: scheduledTransfers, icon: 'ArrowLeftRight', trend: 'neutral', change: '0%' },
+      { label: 'Total Adjustments', value: adjustments.length, icon: 'Settings', trend: 'neutral', change: '0%' },
     ];
 
-    // --- 2. Prepare Chart Data (Stock by Category) ---
+    // --- 2. Prepare Chart Data ---
     const categoryData = Object.keys(categoryMap).map(k => ({ name: k, value: categoryMap[k] }));
 
-    // --- 3. Calculate Stock Trend (Incoming vs Outgoing over time) ---
-    // We will group receipts and deliveries by date (YYYY-MM-DD)
+    // --- 3. Calculate Stock Trend ---
     const trendMap = {};
-
-    // Helper to add to trend map
     const addToTrend = (dateStr, type, qty) => {
-      const date = new Date(dateStr).toISOString().split('T')[0]; // YYYY-MM-DD
+      const date = new Date(dateStr).toISOString().split('T')[0];
       if (!trendMap[date]) trendMap[date] = { date, incoming: 0, outgoing: 0 };
       trendMap[date][type] += qty;
     };
 
-    // Process Receipts (Incoming)
     receipts.forEach(r => {
-      if (r.createdAt) {
-        const totalReceived = r.items.reduce((sum, item) => sum + (item.received || 0), 0);
-        addToTrend(r.createdAt, 'incoming', totalReceived);
-      }
+      if (r.createdAt) addToTrend(r.createdAt, 'incoming', r.items.reduce((sum, item) => sum + (item.received || 0), 0));
     });
 
-    // Process Deliveries (Outgoing)
     deliveries.forEach(d => {
-      if (d.createdAt) {
-        const totalDelivered = d.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-        addToTrend(d.createdAt, 'outgoing', totalDelivered);
-      }
+      if (d.createdAt) addToTrend(d.createdAt, 'outgoing', d.items.reduce((sum, item) => sum + (item.quantity || 0), 0));
     });
 
-    // Convert map to array and sort by date (last 30 entries max to keep chart clean)
     const stockTrend = Object.values(trendMap)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .slice(-30); 
 
-    res.json({ 
-      kpis, 
-      categoryData, 
-      stockTrend 
-    });
+    res.json({ kpis, categoryData, stockTrend });
 
   } catch (e) { 
     console.error("Analytics Error:", e);

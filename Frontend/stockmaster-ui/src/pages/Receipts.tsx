@@ -103,6 +103,12 @@ export default function Receipts() {
       setReceipts(prev => prev.map(r => 
         (r._id === id || r.id === id) ? { ...r, status: 'done' } : r
       ));
+      // Refresh products locally
+      try {
+        const prodRes = await api.get('/products');
+        setProducts(prodRes.data);
+        localStorage.setItem('productsUpdated', String(Date.now()));
+      } catch (e) { console.warn('Failed to refresh products after receipt validate'); }
       toast({ title: 'Receipt validated', description: 'Marked as done' });
     } catch (e) {
       toast({ title: 'Error updating status', variant: 'destructive' });

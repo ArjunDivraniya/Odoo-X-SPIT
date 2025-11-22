@@ -115,6 +115,12 @@ export default function Deliveries() {
       setDeliveries(deliveries.map(del => 
         (del._id || del.id) === deliveryId ? updatedDelivery : del
       ));
+      // Refresh products locally (picking may affect stock later when completed)
+      try {
+        const prodRes = await api.get('/products');
+        setProducts(prodRes.data);
+        localStorage.setItem('productsUpdated', String(Date.now()));
+      } catch (e) { console.warn('Failed to refresh products after marking picked'); }
       
       toast({ title: "Items Marked as Picked" });
     } catch (error) {

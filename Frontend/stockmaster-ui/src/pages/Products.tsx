@@ -41,6 +41,13 @@ export default function Products() {
 
   useEffect(() => {
     fetchData();
+
+    // Listen for product updates from other pages/tabs
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'productsUpdated') fetchData();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   const getStockStatus = (status: string) => {

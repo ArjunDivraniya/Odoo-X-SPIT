@@ -18,6 +18,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.0",
     "nodemailer": "^7.0.10",
-    "otp-generator": "^4.0.1"
+    "otp-generator": "^4.0.1",
+    "socket.io": "^4.8.1"
   }
 }

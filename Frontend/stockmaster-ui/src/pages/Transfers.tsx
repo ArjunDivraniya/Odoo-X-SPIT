@@ -109,6 +109,13 @@ export default function Transfers() {
       const id = transfer._id || transfer.id;
       await api.put(`/transfers/${id}`, payload);
       setTransfers(prev => prev.map(t => (t._id === id || t.id === id) ? { ...t, ...payload } : t));
+      // Refresh products locally
+      try {
+        const prodRes = await api.get('/products');
+        setProducts(prodRes.data);
+        // Notify other pages/tabs to refresh products
+        localStorage.setItem('productsUpdated', String(Date.now()));
+      } catch (e) { console.warn('Failed to refresh products after transfer update'); }
       toast({ title: `Transfer marked as ${nextStatus}` });
     } catch(e) {
       toast({ title: 'Error updating status', variant: 'destructive' });

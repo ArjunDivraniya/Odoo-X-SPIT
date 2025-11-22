@@ -5,8 +5,10 @@ const router = express.Router();
 
 // Helper to get owner ID
 const getOwnerId = (req) => {
-  return req.user.adminId || (req.user.role === 'Admin' ? req.user.id : null);
+  const isAdmin = req.user.role && String(req.user.role).toLowerCase() === 'admin';
+  return req.user.adminId || (isAdmin ? req.user.id : null);
 };
+const { getIO } = require('../socket');
 
 // @route   GET /api/products
 // @desc    Get all products for the logged-in business
@@ -39,6 +41,8 @@ router.post('/', protect, adminOnly, async (req, res) => {
       adminId: ownerId
     });
 
+    // Emit product created to admin room
+    try { const io = getIO(); if (io) io.to(String(ownerId)).emit('productsUpdated', { type: 'created', product }); } catch(e){ }
     res.status(201).json(product);
   } catch (error) {
     console.error(error);
@@ -69,6 +73,8 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
     }
 
     await product.save();
+    // Emit product updated
+    try { const io = getIO(); if (io) io.to(String(product.adminId)).emit('productsUpdated', { type: 'updated', product }); } catch(e){}
     res.json(product);
   } catch (error) {
     console.error(error);
