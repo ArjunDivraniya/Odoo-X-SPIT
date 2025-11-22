@@ -1,97 +1,119 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Warehouse, 
-  Package, 
-  AlertTriangle, 
-  ArrowDownToLine, 
-  ArrowUpFromLine, 
-  Users 
-} from 'lucide-react';
-import { mockWarehouses } from '@/lib/mockData';
-import warehouseHero from '@/assets/warehouse-hero.jpg';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Warehouse, Plus, Package, Users } from 'lucide-react';
+import api from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
+
+interface WarehouseData {
+  _id: string;
+  name: string;
+  location: string;
+  stats: {
+    totalItems: number;
+    lowStock: number;
+    receipts: number;
+    deliveries: number;
+    staffCount: number;
+  };
+}
 
 export default function Warehouses() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newWarehouse, setNewWarehouse] = useState({ name: '', location: '', description: '' });
+
+  useEffect(() => {
+    fetchWarehouses();
+  }, []);
+
+  const fetchWarehouses = async () => {
+    try {
+      const res = await api.get('/warehouse');
+      setWarehouses(res.data);
+    } catch (error) {
+      console.error("Failed to fetch warehouses");
+    }
+  };
+
+  const handleCreate = async () => {
+    try {
+      await api.post('/warehouse', newWarehouse);
+      toast({ title: "Warehouse Created" });
+      setIsCreateOpen(false);
+      fetchWarehouses();
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to create warehouse" });
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <div className="relative h-64 bg-gradient-hero overflow-hidden">
-        <img 
-          src={warehouseHero} 
-          alt="Warehouse" 
-          className="absolute inset-0 w-full h-full object-cover opacity-20"
-        />
-        <div className="relative h-full flex flex-col items-center justify-center text-white z-10 px-4">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Select Warehouse</h1>
-          <p className="text-lg text-white/90 max-w-2xl text-center">
-            Choose a warehouse to manage inventory, track movements, and oversee operations
-          </p>
-        </div>
-      </div>
-
-      {/* Warehouse Cards */}
-      <div className="max-w-7xl mx-auto px-4 -mt-16 pb-12">
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockWarehouses.map((warehouse) => (
-            <Card
-              key={warehouse.id}
-              className="shadow-neumorphic hover:shadow-lg transition-all duration-300 cursor-pointer group animate-fade-in"
-              onClick={() => navigate('/dashboard')}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary transition-colors">
-                    <Warehouse className="w-6 h-6 text-primary group-hover:text-primary-foreground transition-colors" />
-                  </div>
-                  <Badge variant="secondary" className="bg-success/10 text-success">
-                    Active
-                  </Badge>
+    <div className="min-h-screen bg-background p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Select Warehouse</h1>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2"><Plus className="w-4 h-4" /> Add New Warehouse</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Create Warehouse</DialogTitle></DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Name</Label>
+                  <Input value={newWarehouse.name} onChange={e => setNewWarehouse({...newWarehouse, name: e.target.value})} />
                 </div>
+                <div className="space-y-2">
+                  <Label>Location (City, State)</Label>
+                  <Input value={newWarehouse.location} onChange={e => setNewWarehouse({...newWarehouse, location: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Input value={newWarehouse.description} onChange={e => setNewWarehouse({...newWarehouse, description: e.target.value})} />
+                </div>
+                <Button onClick={handleCreate} className="w-full">Create</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
 
+        <div className="grid md:grid-cols-3 gap-6">
+          {warehouses.map((warehouse) => (
+            <Card key={warehouse._id} className="hover:shadow-lg transition-all cursor-pointer" onClick={() => navigate('/dashboard')}>
+              <CardContent className="p-6">
+                <div className="flex justify-between mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Warehouse className="w-6 h-6 text-primary" />
+                  </div>
+                  <Badge variant="secondary">Active</Badge>
+                </div>
                 <h3 className="text-xl font-bold mb-1">{warehouse.name}</h3>
                 <p className="text-sm text-muted-foreground mb-6">{warehouse.location}</p>
-
-                <div className="grid grid-cols-2 gap-4">
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="flex items-center gap-2">
                     <Package className="w-4 h-4 text-primary" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Total Items</p>
-                      <p className="font-semibold">{warehouse.totalItems}</p>
+                      <p className="text-xs text-muted-foreground">Items</p>
+                      <p className="font-semibold">{warehouse.stats.totalItems}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-warning" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Low Stock</p>
-                      <p className="font-semibold">{warehouse.lowStockCount}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ArrowDownToLine className="w-4 h-4 text-info" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Receipts</p>
-                      <p className="font-semibold">{warehouse.pendingReceipts}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ArrowUpFromLine className="w-4 h-4 text-success" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Deliveries</p>
-                      <p className="font-semibold">{warehouse.pendingDeliveries}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">{warehouse.staffCount} staff</span>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Staff</p>
+                      <p className="font-semibold">{warehouse.stats.staffCount}</p>
+                    </div>
                   </div>
-                  <span className="text-sm font-medium text-primary">Select →</span>
                 </div>
+                <Button variant="ghost" className="w-full text-primary">Select →</Button>
               </CardContent>
             </Card>
           ))}

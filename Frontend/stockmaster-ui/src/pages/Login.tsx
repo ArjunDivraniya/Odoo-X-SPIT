@@ -1,21 +1,46 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Warehouse } from 'lucide-react';
-import authIllustration from '@/assets/auth-illustration.jpg';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Warehouse, Loader2 } from 'lucide-react';
+// Ensure this file exists in src/assets. If not, remove this import.
+import authIllustration from '../assets/auth-illustration.jpg';
+import { useToast } from '../components/ui/use-toast';
+import api from '../lib/api';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login - just navigate to warehouse selection
-    navigate('/warehouses');
+    setIsLoading(true);
+
+    try {
+      const res = await api.post('/auth/login', { email, password });
+      
+      // Store token & user info
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      
+      toast({ title: "Welcome back!", description: `Logged in as ${res.data.user.name}` });
+      navigate('/warehouses');
+    } catch (error: any) {
+      console.error("Login error:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Login Failed", 
+        description: error.response?.data?.message || "Invalid credentials or server error" 
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -54,7 +79,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="john@company.com"
+                  placeholder="name@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -62,7 +87,12 @@ export default function Login() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Button variant="link" className="p-0 h-auto text-xs text-primary" type="button">
+                    Forgot password?
+                  </Button>
+                </div>
                 <Input
                   id="password"
                   type="password"
@@ -73,24 +103,22 @@ export default function Login() {
                   className="h-11"
                 />
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded" />
-                  <span>Remember me</span>
-                </label>
-                <Button variant="link" className="p-0 h-auto text-primary">
-                  Forgot password?
-                </Button>
-              </div>
-              <Button type="submit" className="w-full h-11 gradient-primary text-primary-foreground">
-                Sign In
+              
+              <Button 
+                type="submit" 
+                className="w-full h-11 gradient-primary text-primary-foreground"
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign In"}
               </Button>
+
               <div className="text-center text-sm text-muted-foreground">
                 Don't have an account?{' '}
                 <Button 
                   variant="link" 
                   className="p-0 h-auto text-primary"
                   onClick={() => navigate('/signup')}
+                  type="button"
                 >
                   Sign up
                 </Button>
