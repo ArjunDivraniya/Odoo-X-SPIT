@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, ArrowLeftRight, CheckCircle2, Truck, Clock } from 'lucide-react';
 import { mockTransfers } from '@/lib/mockData';
+import { useState } from 'react';
+import TransferForm from '@/components/transfers/TransferForm';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Transfers() {
   const getStatusBadge = (status: string) => {
@@ -30,6 +33,11 @@ export default function Transfers() {
     }
   };
 
+  const [transfers, setTransfers] = useState(mockTransfers);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const { toast } = useToast();
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -39,7 +47,7 @@ export default function Transfers() {
             <h1 className="text-3xl font-bold mb-2">Internal Transfers</h1>
             <p className="text-muted-foreground">Move inventory between warehouses</p>
           </div>
-          <Button className="gradient-primary text-primary-foreground gap-2">
+          <Button className="gradient-primary text-primary-foreground gap-2" onClick={()=>{ setEditing(null); setOpen(true); }}>
             <Plus className="w-4 h-4" />
             New Transfer
           </Button>
@@ -47,7 +55,7 @@ export default function Transfers() {
 
         {/* Transfers List */}
         <div className="space-y-4">
-          {mockTransfers.map((transfer) => (
+          {transfers.map((transfer) => (
             <Card key={transfer.id} className="shadow-neumorphic hover:shadow-lg transition-all animate-fade-in">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
@@ -103,7 +111,7 @@ export default function Transfers() {
                   </div>
                   <div className="flex flex-col items-end gap-3">
                     {getStatusIcon(transfer.status)}
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => toast({ title: 'Tracking started', description: `Transfer ${transfer.id}` })}>
                       Track
                     </Button>
                   </div>
@@ -112,6 +120,12 @@ export default function Transfers() {
             </Card>
           ))}
         </div>
+        <TransferForm open={open} onClose={()=>{ setOpen(false); setEditing(null); }} onSave={(data:any)=>{
+          const id = `TRF-2025-${Math.floor(Math.random()*900)+100}`;
+          setTransfers(prev => [{ id, ...data, createdBy: 'You' }, ...prev]);
+          toast({ title: 'Transfer created' });
+          setOpen(false);
+        }} initial={editing} />
       </div>
     </MainLayout>
   );

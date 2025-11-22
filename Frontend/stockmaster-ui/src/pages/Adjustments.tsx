@@ -2,9 +2,12 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import AdjustmentForm from '@/components/adjustments/AdjustmentForm';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Adjustments() {
-  const adjustments = [
+  const [adjustments, setAdjustments] = useState([
     {
       id: 'ADJ-2025-001',
       date: '2025-11-21',
@@ -27,7 +30,9 @@ export default function Adjustments() {
       reason: 'Damage',
       performedBy: 'James Wilson',
     },
-  ];
+  ]);
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
 
   return (
     <MainLayout>
@@ -38,7 +43,7 @@ export default function Adjustments() {
             <h1 className="text-3xl font-bold mb-2">Stock Adjustments</h1>
             <p className="text-muted-foreground">Record and track inventory adjustments</p>
           </div>
-          <Button className="gradient-primary text-primary-foreground gap-2">
+          <Button className="gradient-primary text-primary-foreground gap-2" onClick={()=>setOpen(true)}>
             <Plus className="w-4 h-4" />
             New Adjustment
           </Button>
@@ -98,6 +103,12 @@ export default function Adjustments() {
             </Card>
           ))}
         </div>
+        <AdjustmentForm open={open} onClose={()=>setOpen(false)} onSave={(data:any)=>{
+          const id = `ADJ-2025-${Math.floor(Math.random()*900)+100}`;
+          setAdjustments(prev => [{ id, ...data }, ...prev]);
+          toast({ title: 'Adjustment recorded' });
+          setOpen(false);
+        }} />
       </div>
     </MainLayout>
   );

@@ -14,11 +14,17 @@ import {
   Package,
 } from 'lucide-react';
 import { mockProducts } from '@/lib/mockData';
+import ProductForm from '@/components/products/ProductForm';
+import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
 export default function Products() {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  const [products, setProducts] = useState<any[]>(mockProducts);
+  const [openForm, setOpenForm] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const { toast } = useToast();
 
   const getStockStatus = (status: string) => {
     switch (status) {
@@ -42,7 +48,7 @@ export default function Products() {
             <h1 className="text-3xl font-bold mb-2">Products</h1>
             <p className="text-muted-foreground">Manage your product inventory</p>
           </div>
-          <Button className="gradient-primary text-primary-foreground gap-2">
+          <Button className="gradient-primary text-primary-foreground gap-2" onClick={()=>{ setEditing(null); setOpenForm(true); }}>
             <Plus className="w-4 h-4" />
             Add Product
           </Button>
@@ -67,7 +73,15 @@ export default function Products() {
                 <Filter className="w-4 h-4" />
                 Filters
               </Button>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => {
+                const csv = [
+                  ['ID','SKU','Name','Category','Unit','MinLevel','MaxLevel','Warehouses|Qty'],
+                  ...products.map(p => [p.id || '', p.sku || '', p.name || '', p.category || '', p.unit || '', p.minLevel || '', p.maxLevel || '', Object.entries(p.stock||{}).map(([k,v])=>`${k}:${v}`).join('|')])
+                ].map(r => r.map(c => `"${String(c||'').replace(/"/g,'""') }"`).join(',')).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'products.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+              }}>
                 <Download className="w-4 h-4" />
                 Export
               </Button>
@@ -77,7 +91,7 @@ export default function Products() {
 
         {/* Products Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockProducts.map((product) => (
+          {products.filter(p => (p.name + p.sku).toLowerCase().includes(searchQuery.toLowerCase())).map((product) => (
             <Card key={product.id} className="shadow-neumorphic hover:shadow-lg transition-all group animate-fade-in">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
@@ -119,7 +133,7 @@ export default function Products() {
                       <Eye className="w-4 h-4 mr-2" />
                       View
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => { setEditing(product); setOpenForm(true); }}>
                       <Edit className="w-4 h-4 mr-2" />
                       Edit
                     </Button>
@@ -129,6 +143,17 @@ export default function Products() {
             </Card>
           ))}
         </div>
+        <ProductForm open={openForm} onClose={()=>{ setOpenForm(false); setEditing(null); }} onSave={(data:any)=>{
+          if (editing) {
+            setProducts(prev => prev.map(p => p.id === editing.id ? { ...p, ...data } : p));
+            toast({ title: 'Product updated' });
+          } else {
+            const id = `PRD${Math.floor(Math.random()*90000)+100}`;
+            setProducts(prev => [{ id, ...data }, ...prev]);
+            toast({ title: 'Product added' });
+          }
+          setOpenForm(false); setEditing(null);
+        }} initial={editing} />
       </div>
     </MainLayout>
   );

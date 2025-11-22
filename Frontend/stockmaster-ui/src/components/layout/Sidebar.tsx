@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Warehouse,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,14 @@ const menuItems = [
   { title: 'Movement Ledger', icon: FileText, path: '/movements' },
   { title: 'Analytics', icon: BarChart3, path: '/analytics' },
 ];
+
+// Add Users menu only for Admin (UI-only check). In real app, use auth context.
+const currentUserRole = 'Admin';
+if (currentUserRole === 'Admin') {
+  menuItems.splice(2, 0, { title: 'Users', icon: User, path: '/users' });
+  // Insert Settings menu for Admin
+  menuItems.splice(3, 0, { title: 'Settings', icon: Settings, path: '/settings' });
+}
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
