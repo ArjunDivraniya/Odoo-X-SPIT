@@ -11,7 +11,7 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
-  Warehouse,
+  Warehouse, // Ensure this is imported
   User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,6 @@ export function Sidebar() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    // Load user data
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
@@ -40,6 +39,8 @@ export function Sidebar() {
 
   const menuItems = [
     { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    // Added Warehouses menu item here
+    { title: 'Warehouses', icon: Warehouse, path: '/warehouses' }, 
     { title: 'Products', icon: Package, path: '/products' },
     { title: 'Receipts', icon: ArrowDownToLine, path: '/receipts' },
     { title: 'Deliveries', icon: ArrowUpFromLine, path: '/deliveries' },
@@ -49,27 +50,18 @@ export function Sidebar() {
     { title: 'Analytics', icon: BarChart3, path: '/analytics' },
   ];
 
-  // Normalize role and control menu visibility
   const role = user?.role ? String(user.role).toLowerCase() : null;
 
-  // Admin: full access (Users + Settings)
   if (role === 'admin') {
     if (!menuItems.find(i => i.title === 'Users')) {
-      menuItems.splice(2, 0, { title: 'Users', icon: User, path: '/users' });
+      menuItems.splice(3, 0, { title: 'Users', icon: User, path: '/users' });
     }
     if (!menuItems.find(i => i.title === 'Settings')) {
-      menuItems.splice(8, 0, { title: 'Settings', icon: Settings, path: '/settings' });
+      menuItems.push({ title: 'Settings', icon: Settings, path: '/settings' });
     }
   }
 
-  // Inventory Manager: remove Users & Settings but keep Analytics
-  if (role === 'inventory manager') {
-    // do nothing here; default menu already contains analytics and inventory items
-  }
-
-  // Warehouse Staff & Picker: hide Analytics
   if (role === 'warehouse staff' || role === 'picker') {
-    // remove Analytics from menu
     const idx = menuItems.findIndex(i => i.title === 'Analytics');
     if (idx >= 0) menuItems.splice(idx, 1);
   }
@@ -81,7 +73,6 @@ export function Sidebar() {
         collapsed ? "w-16" : "w-64"
       )}
     >
-      {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
         {!collapsed && (
           <div className="flex items-center gap-2">
@@ -101,7 +92,6 @@ export function Sidebar() {
         </Button>
       </div>
 
-      {/* Navigation */}
       <nav className="p-2 space-y-1">
         {menuItems.map((item) => (
           <NavLink
@@ -119,7 +109,6 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* User Section */}
       {!collapsed && user && (
         <div className="absolute bottom-4 left-2 right-2 p-3 rounded-lg bg-sidebar-accent">
           <div className="flex items-center gap-3">
