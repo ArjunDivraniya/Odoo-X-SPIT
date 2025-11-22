@@ -89,7 +89,12 @@ export default function Login() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  <Button variant="link" className="p-0 h-auto text-xs text-primary" type="button">
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-xs text-primary" 
+                    type="button"
+                    onClick={() => navigate('/forgot-password')}
+                  >
                     Forgot password?
                   </Button>
                 </div>

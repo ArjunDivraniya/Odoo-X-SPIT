@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
   auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
 });
 
-// 1. Send OTP
+// 1. Send OTP (For Signup)
 router.post('/send-otp', async (req, res) => {
   const { email } = req.body;
   const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -94,6 +94,78 @@ router.post('/login', async (req, res) => {
       adminId: tokenAdminId // Ensure frontend receives a usable adminId
     }
   });
+});
+
+// 4. Forgot Password - Send Reset OTP
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Generate OTP
+    const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false });
+    
+    // Clear any existing OTPs for this email to avoid confusion
+    await Otp.deleteMany({ email: normalizedEmail });
+    
+    // Save new OTP
+    await Otp.create({ email: normalizedEmail, otp });
+
+    // Send Email
+    try {
+      await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: normalizedEmail,
+          subject: 'Reset Your Password - StockMaster',
+          html: `<p>You requested a password reset.</p><p>Your OTP is: <strong>${otp}</strong></p><p>This code expires in 5 minutes.</p>`
+      });
+      console.log(`RESET OTP TO ${normalizedEmail}: ${otp}`); 
+      res.json({ message: 'OTP sent successfully' });
+    } catch (error) {
+      console.error("Email send error:", error);
+      // In dev environment, we might still want to succeed if email fails but we log the OTP
+      // For production, you'd want to return 500.
+      if (process.env.NODE_ENV === 'development') {
+         res.json({ message: 'OTP generated (Email failed check console)' });
+      } else {
+         res.status(500).json({ message: 'Error sending email' });
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// 5. Reset Password with OTP
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    // Verify OTP
+    const validOtp = await Otp.findOne({ email: normalizedEmail, otp });
+    if (!validOtp) return res.status(400).json({ message: 'Invalid or expired OTP' });
+
+    // Update User Password
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    // Cleanup used OTP
+    await Otp.deleteMany({ email: normalizedEmail });
+
+    res.json({ message: 'Password has been reset successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error during password reset' });
+  }
 });
 
 module.exports = router;
