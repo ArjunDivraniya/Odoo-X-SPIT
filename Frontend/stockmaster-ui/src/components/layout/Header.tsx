@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Bell, Moon, Sun, User, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,12 +16,37 @@ import { mockNotifications } from '@/lib/mockData';
 
 export function Header() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [user, setUser] = useState<any>(null); // State for user
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Load user from local storage
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Failed to parse user data");
+      }
+    }
+  }, []);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     document.documentElement.classList.toggle('dark');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
+
+  // Get initials
+  const getInitials = (name: string) => {
+    if (!name) return 'JD';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
@@ -76,23 +101,30 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="gap-2">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
-                  JD
+                  {getInitials(user?.name)}
                 </div>
+                {/* Optional: Show name in header if desired */}
+                {/* <span className="hidden md:inline-block">{user?.name || 'User'}</span> */}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-popover">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{user?.name || 'Guest User'}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{user?.email || ''}</p>
+                </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <User className="w-4 h-4 mr-2" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/login')} className="text-destructive">
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </DropdownMenuItem>

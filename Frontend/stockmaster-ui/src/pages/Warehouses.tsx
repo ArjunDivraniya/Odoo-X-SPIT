@@ -43,16 +43,22 @@ export default function Warehouses() {
     }
   };
 
-  const handleCreate = async () => {
-    try {
-      await api.post('/warehouse', newWarehouse);
-      toast({ title: "Warehouse Created" });
-      setIsCreateOpen(false);
-      fetchWarehouses();
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to create warehouse" });
-    }
-  };
+// In src/pages/Warehouses.tsx
+const handleCreate = async () => {
+  try {
+    await api.post('/warehouse', newWarehouse);
+    toast({ title: "Warehouse Created" });
+    setIsCreateOpen(false);
+    fetchWarehouses();
+  } catch (error: any) { // Type as any to access response
+    console.error("Create Warehouse Error:", error.response?.data || error);
+    toast({ 
+        variant: "destructive", 
+        title: "Error", 
+        description: error.response?.data?.message || "Failed to create warehouse" 
+    });
+  }
+};
 
   return (
     <div className="min-h-screen bg-background p-8">

@@ -6,7 +6,7 @@ const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // contains { id, role }
+    req.user = decoded; // contains { id, role, adminId }
     next();
   } catch (err) {
     res.status(401).json({ message: 'Token is not valid' });
@@ -14,7 +14,10 @@ const protect = (req, res, next) => {
 };
 
 const adminOnly = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  // Convert role to lowercase for comparison to handle 'Admin' and 'admin'
+  const userRole = req.user.role ? req.user.role.toLowerCase() : '';
+  
+  if (userRole !== 'admin') {
     return res.status(403).json({ message: 'Access denied. Admins only.' });
   }
   next();
