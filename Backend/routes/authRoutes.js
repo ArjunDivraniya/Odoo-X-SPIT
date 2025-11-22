@@ -71,21 +71,25 @@ router.post('/login', async (req, res) => {
   }
 
   // Include adminId in token so we know which "Business" this user belongs to
+  // Normalize role and ensure adminId fallback for Admin users
+  const isAdmin = user.role && String(user.role).toLowerCase() === 'admin';
+  const tokenAdminId = user.adminId || (isAdmin ? user._id : undefined);
+
   const token = jwt.sign(
-    { id: user._id, role: user.role, adminId: user.adminId }, 
-    process.env.JWT_SECRET, 
+    { id: user._id, role: user.role, adminId: tokenAdminId },
+    process.env.JWT_SECRET,
     { expiresIn: '1d' }
   );
-  
-  res.json({ 
-    token, 
-    user: { 
-      id: user._id, 
-      name: user.fullName, 
+
+  res.json({
+    token,
+    user: {
+      id: user._id,
+      name: user.fullName,
       role: user.role,
       email: user.email,
-      adminId: user.adminId // Send back for frontend reference if needed
-    } 
+      adminId: tokenAdminId // Ensure frontend receives a usable adminId
+    }
   });
 });
 

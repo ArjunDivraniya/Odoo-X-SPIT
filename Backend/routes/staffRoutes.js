@@ -14,24 +14,36 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Helper to format user for frontend
+const formatUser = (user) => ({
+  id: user._id,
+  name: user.fullName,
+  email: user.email,
+  role: user.role,
+  warehouses: user.warehouses,
+  phone: user.phone,
+  status: user.status,
+  avatar: user.avatar,
+  createdOn: user.createdAt,
+  activities: user.activities || []
+});
+
 // @route   POST /api/staff/create
-// @desc    Admin creates a new user/staff member
+// @desc    Create User
 router.post('/create', protect, adminOnly, async (req, res) => {
   try {
     const { name, email, role, warehouses, phone, status } = req.body;
 
     const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'User with this email already exists' });
-    }
+    if (userExists) return res.status(400).json({ message: 'User already exists' });
 
-    const randomPassword = otpGenerator.generate(10, { upperCaseAlphabets: true, specialChars: true, digits: true, lowerCaseAlphabets: true });
+    const randomPassword = otpGenerator.generate(10, { upperCaseAlphabets: true, specialChars: true, digits: true });
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
     const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`;
-
-    // CRITICAL FIX: Link new user to the current Admin's business
-    // req.user.adminId comes from the JWT token we updated in authRoutes
-    const businessOwnerId = req.user.role === 'Admin' ? req.user.id : req.user.adminId;
+    
+    // Link to creator (Admin) - support case-insensitive role values
+    const isAdminRole = req.user.role && String(req.user.role).toLowerCase() === 'admin';
+    const businessOwnerId = isAdminRole ? req.user.id : req.user.adminId;
 
     const newUser = await User.create({
       fullName: name,
@@ -43,78 +55,76 @@ router.post('/create', protect, adminOnly, async (req, res) => {
       status: status || 'active',
       avatar: avatarUrl,
       isVerified: true,
-      adminId: businessOwnerId // Link to the creating Admin
+      adminId: businessOwnerId
     });
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Welcome to StockMaster - Your Login Credentials',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-          <h2 style="color: #2563eb;">Welcome to StockMaster!</h2>
-          <p>Hello <strong>${name}</strong>,</p>
-          <p>Your account has been successfully created.</p>
-          <div style="background: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Password:</strong> ${randomPassword}</p>
-          </div>
-          <a href="http://localhost:5173/login">Login Now</a>
-        </div>
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
+    // Try sending email (don't crash if it fails)
+    try {
+      if(process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: email,
+          subject: 'Welcome to StockMaster',
+          html: `<p>Login with: <strong>${email}</strong> / <strong>${randomPassword}</strong></p>`
+        });
+      }
+    } catch (e) { console.log("Email skipped:", e.message); }
 
     res.status(201).json({ 
       message: 'User created successfully',
-      user: { ...newUser._doc, id: newUser._id } // Ensure id is returned
+      user: formatUser(newUser) 
     });
 
   } catch (error) {
-    console.error('Error creating user:', error);
-    res.status(500).json({ message: 'Server error while creating user' });
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
 // @route   GET /api/staff
-// @desc    Get all users associated with the current Admin's business
+// @desc    Get Users
 router.get('/', protect, async (req, res) => {
   try {
-    // CRITICAL FIX: Filter by adminId.
-    // If I am an Admin, my adminId is my own ID (set during signup).
-    // If I am Staff, my adminId points to my boss.
-    // In both cases, req.user.adminId (from token) groups us together.
-    
-    // Fallback: if req.user.adminId isn't in token yet (old token), use req.user.id if admin
-    const ownerId = req.user.adminId || (req.user.role === 'Admin' || req.user.role === 'admin' ? req.user.id : null);
+    const isAdmin = req.user.role && String(req.user.role).toLowerCase() === 'admin';
+    const ownerId = req.user.adminId || (isAdmin ? req.user.id : null);
+    if (!ownerId) return res.json([]); 
 
-    if (!ownerId) {
-      return res.status(400).json({ message: 'Unable to determine business owner' });
-    }
-
-    // Find all users that belong to this Admin ID
-    const users = await User.find({ adminId: ownerId })
-      .select('-password')
-      .sort({ createdAt: -1 });
-    
-    const formattedUsers = users.map(user => ({
-      id: user._id,
-      name: user.fullName,
-      email: user.email,
-      role: user.role,
-      warehouses: user.warehouses,
-      phone: user.phone,
-      status: user.status,
-      avatar: user.avatar,
-      createdOn: user.createdAt,
-      activities: user.activities || []
-    }));
-
-    res.json(formattedUsers);
+    const users = await User.find({ adminId: ownerId }).sort({ createdAt: -1 });
+    res.json(users.map(formatUser));
   } catch (error) {
-    console.error(error);
     res.status(500).json({ message: 'Error fetching users' });
+  }
+});
+
+// @route   PUT /api/staff/:id
+// @desc    Update User (CRITICAL FOR EDIT)
+router.put('/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Update fields if provided
+    if (req.body.name) user.fullName = req.body.name;
+    if (req.body.role) user.role = req.body.role;
+    if (req.body.warehouses) user.warehouses = req.body.warehouses;
+    if (req.body.phone) user.phone = req.body.phone;
+    if (req.body.status) user.status = req.body.status;
+
+    await user.save();
+    res.json({ message: 'User updated', user: formatUser(user) });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating user' });
+  }
+});
+
+// @route   DELETE /api/staff/:id
+// @desc    Delete User
+router.delete('/:id', protect, adminOnly, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting user' });
   }
 });
 
