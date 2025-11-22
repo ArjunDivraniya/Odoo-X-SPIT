@@ -1,6 +1,6 @@
 const express = require('express');
 const Receipt = require('../models/Receipt');
-const Product = require('../models/Product');
+const Product = require('../models/Product'); // Import Product Model
 const { protect } = require('../middleware/authMiddleware');
 const router = express.Router();
 
@@ -39,33 +39,33 @@ router.post('/', protect, async (req, res) => {
   } catch (e) { res.status(500).json({ message: 'Error creating receipt' }); }
 });
 
-// PUT (Update) - CRITICAL FIX FOR STOCK UPDATE
+// PUT (Update) - INCLUDES STOCK UPDATE LOGIC
 router.put('/:id', protect, async (req, res) => {
   try {
-    const ownerId = getOwnerId(req);
-    const oldReceipt = await Receipt.findById(req.params.id);
-    
-    if (!oldReceipt) return res.status(404).json({ message: 'Receipt not found' });
+    const receipt = await Receipt.findById(req.params.id);
+    if (!receipt) return res.status(404).json({ message: 'Receipt not found' });
 
-    // Check if status is changing to 'done'
-    if (req.body.status === 'done' && oldReceipt.status !== 'done') {
-      // Update stock for each item
-      for (const item of oldReceipt.items) {
-        // Find product by Name and AdminId
+    // Check if status is being changed to 'done' and it wasn't done before
+    if (req.body.status === 'done' && receipt.status !== 'done') {
+      const ownerId = receipt.adminId;
+      
+      // Iterate over items to update product stock
+      for (const item of receipt.items) {
         const product = await Product.findOne({ name: item.product, adminId: ownerId });
-          if (product) {
-          const warehouseId = oldReceipt.warehouse;
-          const currentQty = product.stock.get(warehouseId) || 0;
-          // Increase stock by received amount (or ordered if received not set)
-          const qtyToAdd = item.received || item.ordered;
+        
+        if (product) {
+          // Get current stock for the warehouse, default to 0 if undefined
+          const currentStock = product.stock.get(receipt.warehouse) || 0;
+          // Use received quantity if available, otherwise ordered quantity
+          const qtyToAdd = item.received > 0 ? item.received : item.ordered;
           
-          product.stock.set(warehouseId, currentQty + qtyToAdd);
+          product.stock.set(receipt.warehouse, currentStock + qtyToAdd);
           await product.save();
-          try { const { getIO } = require('../socket'); const io = getIO(); if (io) io.to(String(ownerId)).emit('productsUpdated', { type: 'stock_change', product }); } catch(e){}
         }
       }
     }
 
+    // Proceed with normal update
     const updatedReceipt = await Receipt.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updatedReceipt);
   } catch (e) { 
