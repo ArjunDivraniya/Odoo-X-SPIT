@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   // Adjust the port if your backend is running on a different one (e.g. 5000)
-  baseURL: 'http://localhost:5000/api', 
+  baseURL: 'https://stock-management-system-qcrz.onrender.com/api', 
 });
 
 // Add token to requests
