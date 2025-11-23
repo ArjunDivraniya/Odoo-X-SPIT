@@ -1,42 +1,92 @@
 const express = require('express');
 const Warehouse = require('../models/WareHouse');
+const User = require('../models/User');
+const Product = require('../models/Product');
+const Receipt = require('../models/Receipt');
+const Delivery = require('../models/Delivery');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 const router = express.Router();
 
-// Get Warehouses
-// Filter by the current logged-in Admin's ID (Business Owner)
+// @route   GET /api/warehouse
+// @desc    Get Warehouses with Real-Time Stats
 router.get('/', protect, async (req, res) => {
   try {
-    // Determine the owner ID. 
-    // If logged in user is Admin, they are the owner. 
-    // If staff, we use the adminId stored in their token/user record.
-    // Fallback to req.user.id if adminId is missing (for root admins)
-    const isAdmin = req.user.role && String(req.user.role).toLowerCase() === 'admin';
-    const ownerId = req.user.adminId || (isAdmin ? req.user.id : null);
+    // Determine the owner ID (Admin)
+    const ownerId = req.user.adminId || (req.user.role === 'Admin' || req.user.role === 'admin' ? req.user.id : null);
 
     if (!ownerId) {
        return res.json([]); 
     }
 
+    // 1. Fetch all warehouses for this admin
     const warehouses = await Warehouse.find({ adminId: ownerId });
-    res.json(warehouses);
+
+    // 2. Calculate stats dynamically for each warehouse
+    // We use Promise.all to run these calculations in parallel for performance
+    const warehousesWithStats = await Promise.all(warehouses.map(async (wh) => {
+      const whId = wh._id.toString();
+
+      // A. Count Staff assigned to this warehouse
+      const staffCount = await User.countDocuments({ 
+        adminId: ownerId,
+        warehouses: whId 
+      });
+
+      // B. Calculate Inventory Stats (Total Items & Low Stock)
+      // We fetch all products and sum up the stock for this specific warehouse
+      const products = await Product.find({ adminId: ownerId });
+      let totalItems = 0;
+      let lowStock = 0;
+
+      products.forEach(p => {
+        // Access the Map using .get() since stock is a Mongoose Map
+        const qty = p.stock ? (p.stock.get(whId) || 0) : 0;
+        totalItems += qty;
+        
+        if (qty > 0 && qty <= (p.minLevel || 0)) {
+          lowStock++;
+        }
+      });
+
+      // C. Count Pending Receipts (Incoming)
+      const receipts = await Receipt.countDocuments({ 
+        adminId: ownerId, 
+        warehouse: whId, 
+        status: { $ne: 'done' } 
+      });
+
+      // D. Count Pending Deliveries (Outgoing)
+      const deliveries = await Delivery.countDocuments({ 
+        adminId: ownerId, 
+        warehouse: whId, 
+        status: { $ne: 'completed' } 
+      });
+
+      // Return the warehouse object with the new dynamic stats
+      return {
+        ...wh.toObject(),
+        stats: {
+          totalItems,
+          staffCount,
+          lowStock,
+          receipts,
+          deliveries
+        }
+      };
+    }));
+
+    res.json(warehousesWithStats);
   } catch (error) {
     console.error("Error fetching warehouses:", error);
     res.status(500).json({ message: 'Error fetching warehouses' });
   }
 });
 
-// Create Warehouse (Admin Only)
+// @route   POST /api/warehouse
+// @desc    Create Warehouse (Admin Only)
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
     const { name, location, description } = req.body;
-    
-    // Determine the owner ID. 
-    // For a logged-in Admin, this is their own ID.
-    // We use req.user.adminId if it exists (for sub-admins), otherwise req.user.id
-    // Crucially, for a new Root Admin, req.user.adminId might be their own ID or undefined depending on signup flow.
-    // The safest bet for an 'adminOnly' route is that the creator IS the owner if they are a Root Admin.
-    
     const ownerId = req.user.adminId || req.user.id;
 
     if (!ownerId) {
@@ -47,8 +97,8 @@ router.post('/', protect, adminOnly, async (req, res) => {
       name,
       location,
       description,
-      adminId: ownerId, // Assign to the business owner
-      stats: { // Initialize stats
+      adminId: ownerId,
+      stats: { // Initial stats are 0
         totalItems: 0,
         lowStock: 0,
         receipts: 0,

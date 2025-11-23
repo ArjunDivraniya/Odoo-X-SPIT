@@ -1,6 +1,6 @@
 const express = require('express');
 const Transfer = require('../models/Transfer');
-const Product = require('../models/Product'); // Import Product Model
+// const Product = require('../models/Product'); // Import Product Model
 const Product = require('../models/Product');
 const { protect } = require('../middleware/authMiddleware');
 const router = express.Router();
