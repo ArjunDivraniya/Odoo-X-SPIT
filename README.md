@@ -6,7 +6,7 @@
 
 [![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge)](https://odoo-management-system-ad.vercel.app/)
 [![Video Walkthrough](https://img.shields.io/badge/Video-Walkthrough-red?style=for-the-badge&logo=youtube)](https://youtu.be/dRXl1a0PcGA?si=NSsz7l0SvST5tyQN)
-[![API Docs](https://img.shields.io/badge/API-Postman-orange?style=for-the-badge&logo=postman)](https://documenter.getpostman.com/your-docs)
+[![API Docs](https://img.shields.io/badge/API-Postman-orange?style=for-the-badge&logo=postman)]( https://documenter.getpostman.com/view/39216595/2sB3dVLmUo)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/ArjunDivraniya/Odoo-X-SPIT.git)
 
 
