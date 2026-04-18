@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const otpGenerator = require('otp-generator');
 const { MailtrapClient } = require('mailtrap');
+const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const router = express.Router();
@@ -14,18 +15,40 @@ const mailtrapSender = {
   name: process.env.MAILTRAP_SENDER_NAME || 'StockMaster'
 };
 
+const gmailConfigured = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+const gmailTransporter = gmailConfigured
+  ? nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    })
+  : null;
+
 async function sendOtpEmail(to, otp, subject) {
-  if (!mailtrapClient) {
-    throw new Error('MAILTRAP_TOKEN is not configured');
+  if (mailtrapClient) {
+    await mailtrapClient.send({
+      from: mailtrapSender,
+      to: [{ email: to }],
+      subject,
+      text: `Your OTP is ${otp}`,
+      category: 'StockMaster OTP'
+    });
+    return;
   }
 
-  await mailtrapClient.send({
-    from: mailtrapSender,
-    to: [{ email: to }],
-    subject,
-    text: `Your OTP is ${otp}`,
-    category: 'StockMaster OTP'
-  });
+  if (gmailTransporter) {
+    await gmailTransporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to,
+      subject,
+      text: `Your OTP is ${otp}`
+    });
+    return;
+  }
+
+  throw new Error('No email provider configured. Set MAILTRAP_TOKEN or EMAIL_USER/EMAIL_PASS.');
 }
 
 // 1. Send OTP (For Signup)
@@ -38,9 +61,9 @@ router.post('/send-otp', async (req, res) => {
       return res.status(400).json({ message: 'Email is required' });
     }
 
-    if (!mailtrapClient) {
+    if (!mailtrapClient && !gmailTransporter) {
       return res.status(500).json({
-        message: 'Mailtrap is not configured. Set MAILTRAP_TOKEN in backend environment variables.'
+        message: 'No email provider configured. Set MAILTRAP_TOKEN or EMAIL_USER/EMAIL_PASS.'
       });
     }
 
