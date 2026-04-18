@@ -7,27 +7,50 @@ const User = require('../models/User');
 const Otp = require('../models/Otp');
 const router = express.Router();
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-});
+const isEmailConfigured = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+const transporter = isEmailConfigured
+  ? nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    })
+  : null;
 
 // 1. Send OTP (For Signup)
 router.post('/send-otp', async (req, res) => {
-  const { email } = req.body;
-  const normalizedEmail = String(email || '').trim().toLowerCase();
-  const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false });
-  await Otp.create({ email: normalizedEmail, otp });
+  try {
+    const { email } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: normalizedEmail,
-    subject: 'StockMaster OTP',
-    text: `Your OTP is ${otp}`
-  });
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
 
-  console.log(`MOCK EMAIL TO ${normalizedEmail}: Your OTP is ${otp}`);
-  res.json({ message: 'OTP sent successfully' });
+    if (!isEmailConfigured || !transporter) {
+      return res.status(500).json({
+        message: 'Email service is not configured. Set EMAIL_USER and EMAIL_PASS in backend environment variables.'
+      });
+    }
+
+    const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false });
+
+    // Keep only one active OTP per email for predictable verification.
+    await Otp.deleteMany({ email: normalizedEmail });
+    await Otp.create({ email: normalizedEmail, otp });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: normalizedEmail,
+      subject: 'StockMaster OTP',
+      text: `Your OTP is ${otp}`
+    });
+
+    res.json({ message: 'OTP sent successfully' });
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    res.status(500).json({
+      message: 'Failed to send OTP email. Check SMTP credentials (EMAIL_USER/EMAIL_PASS) and Gmail app password settings.'
+    });
+  }
 });
 
 // 2. Admin Signup
@@ -58,7 +81,7 @@ router.post('/signup', async (req, res) => {
   user.adminId = user._id;
   await user.save();
 
-  await Otp.deleteMany({ email });
+  await Otp.deleteMany({ email: normalizedEmail });
 
   res.status(201).json({ message: 'Admin registered successfully' });
 });
