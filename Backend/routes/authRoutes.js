@@ -2,18 +2,31 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const otpGenerator = require('otp-generator');
-const nodemailer = require('nodemailer');
+const { MailtrapClient } = require('mailtrap');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const router = express.Router();
 
-const isEmailConfigured = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
-const transporter = isEmailConfigured
-  ? nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-    })
-  : null;
+const mailtrapToken = process.env.MAILTRAP_TOKEN;
+const mailtrapClient = mailtrapToken ? new MailtrapClient({ token: mailtrapToken }) : null;
+const mailtrapSender = {
+  email: process.env.MAILTRAP_SENDER_EMAIL || 'hello@demomailtrap.co',
+  name: process.env.MAILTRAP_SENDER_NAME || 'StockMaster'
+};
+
+async function sendOtpEmail(to, otp, subject) {
+  if (!mailtrapClient) {
+    throw new Error('MAILTRAP_TOKEN is not configured');
+  }
+
+  await mailtrapClient.send({
+    from: mailtrapSender,
+    to: [{ email: to }],
+    subject,
+    text: `Your OTP is ${otp}`,
+    category: 'StockMaster OTP'
+  });
+}
 
 // 1. Send OTP (For Signup)
 router.post('/send-otp', async (req, res) => {
@@ -25,9 +38,9 @@ router.post('/send-otp', async (req, res) => {
       return res.status(400).json({ message: 'Email is required' });
     }
 
-    if (!isEmailConfigured || !transporter) {
+    if (!mailtrapClient) {
       return res.status(500).json({
-        message: 'Email service is not configured. Set EMAIL_USER and EMAIL_PASS in backend environment variables.'
+        message: 'Mailtrap is not configured. Set MAILTRAP_TOKEN in backend environment variables.'
       });
     }
 
@@ -37,18 +50,13 @@ router.post('/send-otp', async (req, res) => {
     await Otp.deleteMany({ email: normalizedEmail });
     await Otp.create({ email: normalizedEmail, otp });
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: normalizedEmail,
-      subject: 'StockMaster OTP',
-      text: `Your OTP is ${otp}`
-    });
+    await sendOtpEmail(normalizedEmail, otp, 'StockMaster OTP');
 
     res.json({ message: 'OTP sent successfully' });
   } catch (error) {
     console.error('Send OTP error:', error);
     res.status(500).json({
-      message: 'Failed to send OTP email. Check SMTP credentials (EMAIL_USER/EMAIL_PASS) and Gmail app password settings.'
+      message: 'Failed to send OTP email. Check your Mailtrap token and sender configuration.'
     });
   }
 });
@@ -139,23 +147,12 @@ router.post('/forgot-password', async (req, res) => {
 
     // Send Email
     try {
-      await transporter.sendMail({
-          from: process.env.EMAIL_USER,
-          to: normalizedEmail,
-          subject: 'Reset Your Password - StockMaster',
-          html: `<p>You requested a password reset.</p><p>Your OTP is: <strong>${otp}</strong></p><p>This code expires in 5 minutes.</p>`
-      });
+      await sendOtpEmail(normalizedEmail, otp, 'Reset Your Password - StockMaster');
       console.log(`RESET OTP TO ${normalizedEmail}: ${otp}`); 
       res.json({ message: 'OTP sent successfully' });
     } catch (error) {
       console.error("Email send error:", error);
-      // In dev environment, we might still want to succeed if email fails but we log the OTP
-      // For production, you'd want to return 500.
-      if (process.env.NODE_ENV === 'development') {
-         res.json({ message: 'OTP generated (Email failed check console)' });
-      } else {
-         res.status(500).json({ message: 'Error sending email' });
-      }
+      res.status(500).json({ message: 'Error sending email through Mailtrap' });
     }
   } catch (error) {
     console.error(error);
